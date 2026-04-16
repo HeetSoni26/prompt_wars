@@ -18,11 +18,43 @@ const {
   getRecentSessions,
 } = require('../services/firestoreService');
 const { generateMemorySummary } = require('../services/geminiService');
+const { fetchLinkedInProfile } = require('../services/linkedinService');
 
 const router = express.Router();
 
 router.use(verifyFirebaseToken);
 router.use(apiRateLimiter);
+
+/**
+ * POST /api/memory/sync-linkedin
+ * Syncs user profile with LinkedIn data.
+ * Body: { accessToken }
+ */
+router.post('/sync-linkedin', async (req, res, next) => {
+  try {
+    const { accessToken } = req.body;
+    const { uid } = req.user;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'BadRequest', message: 'LinkedIn access token is required.' });
+    }
+
+    const linkedInData = await fetchLinkedInProfile(accessToken);
+
+    // Update Firestore profile with LinkedIn context
+    await updateUserProfile(uid, {
+      displayName: linkedInData.displayName,
+      targetRole: linkedInData.headline,
+      memorySummary: `LinkedIn Context: ${linkedInData.summary}`,
+      updatedFromLinkedIn: true,
+      linkedInUid: linkedInData.uid,
+    });
+
+    res.json({ message: 'LinkedIn profile synced successfully.', data: linkedInData });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * GET /api/memory/profile

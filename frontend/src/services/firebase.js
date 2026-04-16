@@ -15,7 +15,16 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+// Demo Mode: Allows UI preview even if keys are missing
+export const isDemoMode = !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('REPLACE_ME');
+
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+} catch (e) {
+  console.warn('Firebase init failed (Demo Mode):', e.message);
+  app = { name: '[DEFAULT]' }; // Mock app object
+}
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

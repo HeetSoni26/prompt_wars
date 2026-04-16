@@ -145,6 +145,24 @@ export async function triggerMemorySummarize(user) {
   return res.json();
 }
 
+/**
+ * Syncs user profile with LinkedIn data.
+ * @param {import('firebase/auth').User} user - Authenticated user
+ * @param {string} accessToken - LinkedIn access token
+ * @returns {Promise<Object>} Sync result
+ */
+export async function syncLinkedInProfile(user, accessToken) {
+  const res = await authFetch('/memory/sync-linkedin', user, {
+    method: 'POST',
+    body: JSON.stringify({ accessToken }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to sync LinkedIn profile.');
+  }
+  return res.json();
+}
+
 // ─── Insights API ──────────────────────────────────────────────────────────────
 
 /**

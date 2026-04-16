@@ -80,13 +80,29 @@ async function streamChatResponse({
 
   let fullResponse = '';
 
-  const result = await chat.sendMessageStream(userMessage);
+  try {
+    const result = await chat.sendMessageStream(userMessage);
 
-  for await (const chunk of result.stream) {
-    const text = chunk.text();
-    if (text) {
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        fullResponse += text;
+        res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+      }
+    }
+  } catch (err) {
+    console.error('Gemini API Error (Falling back to Mock):', err.message);
+    // Mock streaming response for Demo/Preview
+    const mockWords = `I'm currently in Demo Mode because the Gemini API is not yet fully provisioned. 
+    However, I can still help you think through your career strategy! Based on your profile as a ${userProfile.targetRole || 'Job Seeker'}, 
+    I recommend focusing on your technical portfolio and networking on LinkedIn. 
+    (Note: Once you enable the Gemini API in Google AI Studio, I'll be able to provide full AI reasoning)`.split(' ');
+    
+    for (const word of mockWords) {
+      const text = word + ' ';
       fullResponse += text;
       res.write(`data: ${JSON.stringify({ chunk: text })}\n\n`);
+      await new Promise(resolve => setTimeout(resolve, 50)); // Simulate typing
     }
   }
 

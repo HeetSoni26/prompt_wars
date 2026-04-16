@@ -12,21 +12,26 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { auth, googleProvider } from '../services/firebase';
+import { auth, googleProvider, isDemoMode } from '../services/firebase';
 
 const AuthContext = createContext(null);
 
-/**
- * AuthProvider wraps the app and exposes auth state and methods.
- * @param {Object} props
- * @param {React.ReactNode} props.children
- */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
+    // If in Demo Mode, simulate a logged-in guest user immediately
+    if (isDemoMode) {
+      const savedUser = localStorage.getItem('cp_guest_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -35,10 +40,26 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
+   * Signs in as a guest (Demo Mode).
+   */
+  const signInAsGuest = useCallback(async () => {
+    const guest = {
+      uid: 'guest-' + Math.random().toString(36).substr(2, 9),
+      displayName: 'Guest User',
+      email: 'guest@example.com',
+      isGuest: true,
+      getIdToken: async () => 'mock-token',
+    };
+    setUser(guest);
+    localStorage.setItem('cp_guest_user', JSON.stringify(guest));
+    return { user: guest };
+  }, []);
+
+  /**
    * Signs in with Google popup.
-   * @returns {Promise<import('firebase/auth').UserCredential>}
    */
   const signInWithGoogle = useCallback(async () => {
+    if (isDemoMode) return await signInAsGuest();
     setAuthError(null);
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -48,14 +69,13 @@ export function AuthProvider({ children }) {
       setAuthError(msg);
       throw new Error(msg);
     }
-  }, []);
+  }, [signInAsGuest]);
 
   /**
    * Signs in with email and password.
-   * @param {string} email
-   * @param {string} password
    */
   const signInWithEmail = useCallback(async (email, password) => {
+    if (isDemoMode) return await signInAsGuest();
     setAuthError(null);
     try {
       return await signInWithEmailAndPassword(auth, email, password);
@@ -64,15 +84,13 @@ export function AuthProvider({ children }) {
       setAuthError(msg);
       throw new Error(msg);
     }
-  }, []);
+  }, [signInAsGuest]);
 
   /**
    * Creates a new account with email, password, and display name.
-   * @param {string} email
-   * @param {string} password
-   * @param {string} displayName
    */
   const signUpWithEmail = useCallback(async (email, password, displayName) => {
+    if (isDemoMode) return await signInAsGuest();
     setAuthError(null);
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -83,12 +101,17 @@ export function AuthProvider({ children }) {
       setAuthError(msg);
       throw new Error(msg);
     }
-  }, []);
+  }, [signInAsGuest]);
 
   /**
    * Signs out the current user.
    */
   const logout = useCallback(async () => {
+    if (isDemoMode) {
+      setUser(null);
+      localStorage.removeItem('cp_guest_user');
+      return;
+    }
     await signOut(auth);
   }, []);
 
@@ -105,8 +128,10 @@ export function AuthProvider({ children }) {
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
+      signInAsGuest,
       logout,
       clearError,
+      isDemoMode,
     }}>
       {children}
     </AuthContext.Provider>
